@@ -8,6 +8,8 @@ var util   = require('util')
   , rimraf = require('rimraf')
   , exec   = require('child_process').exec
   , config = require('./../config.js')
+  , generatePassword = require('password-generator')
+  , https = require('https');
 
 module.exports = Generator
 
@@ -61,7 +63,16 @@ Generator.prototype.getConfig = function getConfig() {
   self.defaultAuthorName = ''
   self.defaultAuthorURI = ''
   self.defaultTheme = 'https://github.com/automattic/_s'
+  self.defaultPlugin = 'https://github.com/welaika/wordless/tarball/master'
+  self.pluginName = 'wordless'
+  self.randomPassword = generatePassword(10, false)
   self.configExists = false
+
+  https.get('https://api.wordpress.org/secret-key/1.1/salt', function(res){
+    res.on("data", function(chunk) {
+      console.log(chunk);
+    });
+  });
 
   config.getConfig(function(err, data) {
     if (!err) {
@@ -97,12 +108,12 @@ Generator.prototype.askFor = function askFor() {
           message: 'Which version of Wordpress do you want?',
           default: self.latestVersion
       },
-      {
-          name: 'includeRequireJS',
-          message: 'Would you like to include RequireJS (for AMD support)?',
-          default: 'Y/n',
-          warning: 'Yes: RequireJS will be placed into the JavaScript vendor directory.'
-      },
+      // {
+      //     name: 'includeRequireJS',
+      //     message: 'Would you like to include RequireJS (for AMD support)?',
+      //     default: 'Y/n',
+      //     warning: 'Yes: RequireJS will be placed into the JavaScript vendor directory.'
+      // },
       {
           name: 'authorName',
           message: 'Author name: ',
@@ -123,7 +134,7 @@ Generator.prototype.askFor = function askFor() {
     self.themeOriginalURL = props.themeBoilerplate
     self.themeBoilerplate = props.themeBoilerplate
     self.wordpressVersion = props.wordpressVersion
-    self.includeRequireJS = (/y/i).test(props.includeRequireJS)
+    //self.includeRequireJS = (/y/i).test(props.includeRequireJS)
     self.authorName = props.authorName
     self.authorURI = props.authorURI
 
@@ -193,76 +204,89 @@ Generator.prototype.createTheme = function createTheme() {
   })
 }
 
-// add Require.js if needed
-Generator.prototype.requireJS = function requireJS() {
+Generator.prototype.getPlugin = function getPlugin() {
   var cb   = this.async()
     , self = this
 
-  if (self.includeRequireJS) {
-    this.remote('jrburke', 'requirejs', '2.0.5', function(err, remote) {
-      if (err) { return cb(err) }
+  self.log.writeln('')
+  self.log.writeln('Now we download the wordless plugin')
 
-      fs.mkdir('app/wp-content/themes/'+self.themeName+'/js', function() {
-        remote.copy('require.js', 'app/wp-content/themes/'+self.themeName+'/js/vendors/require.js')
-        cb()
-      })
-    })
-  }
-  else {
-    cb()
-  }
+  // get wordless plugin  
+  self.tarball(self.defaultPlugin, 'app/wp-content/plugins/'+self.pluginName, cb)
 }
+
+// add Require.js if needed
+// Generator.prototype.requireJS = function requireJS() {
+//   var cb   = this.async()
+//     , self = this
+
+//   if (self.includeRequireJS) {
+//     this.remote('jrburke', 'requirejs', '2.0.5', function(err, remote) {
+//       if (err) { return cb(err) }
+
+//       fs.mkdir('app/wp-content/themes/'+self.themeName+'/js', function() {
+//         remote.copy('require.js', 'app/wp-content/themes/'+self.themeName+'/js/vendors/require.js')
+//         cb()
+//       })
+//     })
+//   }
+//   else {
+//     cb()
+//   }
+// }
 
 // rename all the css files to scss
-Generator.prototype.convertFiles = function convertFiles() {
-  var cb   = this.async()
-    , self = this
+// Generator.prototype.convertFiles = function convertFiles() {
+//   var cb   = this.async()
+//     , self = this
 
-  // parse recursively a directory and rename the css files to .scss
-  function parseDirectory(path) {
-    fs.readdir(path, function(err, files) {
-      files.forEach(function(file) {
-        var pathFile = fs.realpathSync(path+'/'+file)
-          , isDirectory = fs.statSync(pathFile).isDirectory()
+//   // parse recursively a directory and rename the css files to .scss
+//   function parseDirectory(path) {
+//     fs.readdir(path, function(err, files) {
+//       files.forEach(function(file) {
+//         var pathFile = fs.realpathSync(path+'/'+file)
+//           , isDirectory = fs.statSync(pathFile).isDirectory()
 
-        if (isDirectory) {
-          parseDirectory(pathFile)
-        }
-        else {
-          var cssName = /[.]*\.css/i
-          if (cssName.test(file)) {
-            var newName = pathFile.substring(0, pathFile.length - 3) + 'scss'
-            // to avoid deleting style.css which is needed to activate the them,
-            // we do not rename but only create another file then copy the content
-            fs.open(newName, 'w', '0666', function() {
-              fs.readFile(pathFile, 'utf8', function (err, data) {
-                if (err) throw err
-                // Insert the given theme name into SCSS and CSS files
-                data = data.replace(/^.*Theme Name:.*$/mg, 'Theme Name: ' + self.themeNameOriginal)
-                data = data.replace(/^.*Author: .*$/mg, 'Author: ' + self.authorName)
-                data = data.replace(/^.*Author URI: .*$/mg, 'Author URI: ' + self.authorURI)
+//         if (isDirectory) {
+//           parseDirectory(pathFile)
+//         }
+//         else {
+//           var cssName = /[.]*\.css/i
+//           if (cssName.test(file)) {
+//             var newName = pathFile.substring(0, pathFile.length - 3) + 'scss'
+//             // to avoid deleting style.css which is needed to activate the them,
+//             // we do not rename but only create another file then copy the content
+//             fs.open(newName, 'w', '0666', function() {
+//               fs.readFile(pathFile, 'utf8', function (err, data) {
+//                 if (err) throw err
+//                 // Insert the given theme name into SCSS and CSS files
+//                 data = data.replace(/^.*Theme Name:.*$/mg, 'Theme Name: ' + self.themeNameOriginal)
+//                 data = data.replace(/^.*Author: .*$/mg, 'Author: ' + self.authorName)
+//                 data = data.replace(/^.*Author URI: .*$/mg, 'Author URI: ' + self.authorURI)
 
-                fs.writeFile(newName, data)
-                fs.writeFile(pathFile, data)
-              })
-            })
-          }
-        }
-      })
-    })
-  }
+//                 fs.writeFile(newName, data)
+//                 fs.writeFile(pathFile, data)
+//               })
+//             })
+//           }
+//         }
+//       })
+//     })
+//   }
 
-  this.log.writeln('Renaming the css files to scss')
-  parseDirectory('app/wp-content/themes/'+self.themeName)
+//   this.log.writeln('Renaming the css files to scss')
+//   parseDirectory('app/wp-content/themes/'+self.themeName)
 
-  cb()
-}
+//   cb()
+// }
 
 // generate the files to use Yeoman and the git related files
 Generator.prototype.createYeomanFiles = function createYeomanFiles() {
   this.template('Gruntfile.js')
   this.template('bowerrc', '.bowerrc')
+  this.template('wp-config.php', 'app/wp-config.php')
   this.copy('package.json', 'package.json')
+  this.copy('bower.json', 'bower.json')
   this.copy('gitignore', '.gitignore')
   this.copy('gitattributes', '.gitattributes')
 }
