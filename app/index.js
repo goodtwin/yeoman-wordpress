@@ -9,7 +9,7 @@ var util   = require('util')
   , exec   = require('child_process').exec
   , config = require('./../config.js')
   , generatePassword = require('password-generator')
-  , https = require('https');
+  , request = require("request");
 
 module.exports = Generator
 
@@ -68,10 +68,8 @@ Generator.prototype.getConfig = function getConfig() {
   self.randomPassword = generatePassword(10, false)
   self.configExists = false
 
-  https.get('https://api.wordpress.org/secret-key/1.1/salt', function(res){
-    res.on("data", function(chunk) {
-      console.log(chunk);
-    });
+  request('https://api.wordpress.org/secret-key/1.1/salt', function(error, response, body){
+    self.configSalt = body;
   });
 
   config.getConfig(function(err, data) {
