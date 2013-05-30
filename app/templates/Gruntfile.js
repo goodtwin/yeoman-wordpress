@@ -1,5 +1,6 @@
 module.exports = function( grunt ) {
   'use strict';
+  require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
   //
   // Grunt configuration:
   //
@@ -186,11 +187,41 @@ module.exports = function( grunt ) {
     // https://github.com/yeoman/yeoman/issues/250#issuecomment-8024212
     server: {
       port: 35729
+    },
+
+    shell: {
+      wpInit: {
+        command: [
+            'mysql --port=13306 -u root -e "CREATE DATABASE IF NOT EXISTS <%= themeName %>_development;' +
+            'GRANT ALL ON <%= themeName %>_development.* TO \'<%= themeName %>_dev\'@\'localhost\' IDENTIFIED BY \'<%= randomPassword %>\' WITH GRANT OPTION;' +
+            'FLUSH PRIVILEGES;"',
+            'chmod 0777 app/wp-content/themes/<%= themeName %>/tmp',
+            'cd app && wp core install --url=<%= themeName %>.dev --title=<%= themeName %> --admin_name=admin --admin_email=greg@good-twin.com --admin_password=goodtwin',
+            'wp plugin activate wordless',
+            'wp theme activate <%= themeName %>'
+        ].join('&&'),
+        options: {
+            stdout: true
+        }
+      },
+      devDbDump: {
+        timestamp: '<%= new Date().getTime() %>', 
+        command: [
+            'mkdir -p db',
+            'mysqldump <%= themeName %>_development --user=<%= themeName %>_dev --password=<%= randomPassword %> --socket=/opt/boxen/data/mysql/socket --result-file db/<%= new Date().getTime() %>_dev.sql',
+            'cp -f db/<%= new Date().getTime() %>_dev.sql db/dev.sql'
+        ].join('&&'),
+        options: {
+            stdout: true
+        }
+      }
     }
 
   });
 
   // Alias the `test` task to run the `mocha` task instead
   grunt.registerTask('test', 'mocha');
+  grunt.registerTask('wp-init', 'shell:wpInit');
+  grunt.registerTask('dev-db-dump', 'shell:devDbDump');
 
 };

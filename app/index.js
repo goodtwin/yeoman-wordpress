@@ -65,7 +65,7 @@ Generator.prototype.getConfig = function getConfig() {
 	self.defaultAuthorName = '';
 	self.defaultAuthorURI = '';
 	self.defaultTheme = 'https://github.com/goodtwin/wordless-vanilla-theme';
-	self.defaultPlugin = 'https://github.com/welaika/wordless/tarball/master';
+	self.defaultPlugin = 'https://github.com/goodtwin/wordless/tarball/master';
 	self.pluginName = 'wordless';
 	self.randomPassword = generatePassword(10, false);
 	self.configExists = false;
@@ -214,13 +214,32 @@ Generator.prototype.getPlugin = function getPlugin() {
 	self.tarball(self.defaultPlugin, 'app/wp-content/plugins/'+self.pluginName, cb);
 };
 
+Generator.prototype.changeThemeName = function changeThemeName() {
+  var cb   = this.async(),
+    self = this,
+    fileName = 'app/wp-content/themes/'+self.themeName+'/style.css',
+    newName = fileName.substring(0, fileName.length - 3) + 'scss';
+
+  fs.readFile(fileName, 'utf8', function (err, data) {
+    if (err) throw err;
+    // Insert the given theme name into style.css file, which we don't use. But Wordpress wants it. Cool.
+    data = data.replace(/^.*Theme Name:.*$/mg, 'Theme Name: ' + self.themeNameOriginal);
+    data = data.replace(/^.*Author: .*$/mg, 'Author: ' + self.authorName);
+    data = data.replace(/^.*Author URI: .*$/mg, 'Author URI: ' + self.authorURI);
+
+    fs.writeFile(fileName, data);
+  });
+
+  cb();
+};
+
 // generate the files to use Yeoman and the git related files
 Generator.prototype.createYeomanFiles = function createYeomanFiles() {
 	this.template('Gruntfile.js');
 	this.template('bowerrc', '.bowerrc');
 	this.template('wp-config.php', 'app/wp-config.php');
-	this.copy('package.json', 'package.json');
-	this.copy('bower.json', 'bower.json');
+	this.template('package.json', 'package.json');
+	this.template('bower.json', 'bower.json');
 	this.copy('gitignore', '.gitignore');
 	this.copy('gitattributes', '.gitattributes');
 };
@@ -228,7 +247,7 @@ Generator.prototype.createYeomanFiles = function createYeomanFiles() {
 Generator.prototype.endGenerator = function endGenerator() {
 	this.log.writeln('');
 	this.log.writeln('Looks like we\'re done!');
-	this.log.writeln('Now you just need to install Wordpress the usual way');
-	this.log.writeln('Don\'t forget to activate the new theme in the admin panel, and then you can start coding!');
+	this.log.writeln('Now you just need to run `npm install && bower install` and `grunt wp-init`');
+	this.log.writeln('Then you can start coding!');
 	this.log.writeln('');
 };
